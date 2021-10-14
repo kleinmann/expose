@@ -130,7 +130,7 @@ class HttpClient
     protected function sendChunkToServer(string $chunk, ?WebSocket $proxyConnection = null)
     {
         transform($proxyConnection, function ($proxyConnection) use ($chunk) {
-            $binaryMsg = new Frame($chunk, true, Frame::OP_BINARY);
+            $binaryMsg = new Frame($this->rewriteResponseBody($chunk), true, Frame::OP_BINARY);
             $proxyConnection->send($binaryMsg);
         });
     }
@@ -164,5 +164,37 @@ class HttpClient
         );
 
         return $response->withHeader('Location', $location);
+    }
+
+    protected function rewriteResponseBody($chunk)
+    {
+        if (! is_string($chunk)) {
+            return $chunk;
+        }
+
+        $httpProtocol = $this->configuration->port() === 443 ? 'https' : 'http';
+
+        return str_replace(
+            $this->getOriginalHost(),
+            "{$httpProtocol}://{$this->configuration->getUrl($this->connectionData->subdomain)}",
+            $chunk
+        );
+    }
+
+    protected function getOriginalHost()
+    {
+        $host = $this->connectionData->host;
+        $port = substr($host, strpos($host, ':') + 1);
+        $protocol = 'http';
+
+        if ($port === '443') {
+            $protocol = 'https';
+        }
+
+        if ($port === '80' || $port === '443') {
+            $host = substr($host, 0, strpos($host, ':'));
+        }
+
+        return "{$protocol}://{$host}";
     }
 }
