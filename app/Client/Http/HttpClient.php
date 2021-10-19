@@ -174,9 +174,17 @@ class HttpClient
 
         $httpProtocol = $this->configuration->port() === 443 ? 'https' : 'http';
 
+        $rewrittenHost = "{$httpProtocol}://{$this->configuration->getUrl($this->connectionData->subdomain)}";
+
         return str_replace(
-            $this->getOriginalHost(),
-            "{$httpProtocol}://{$this->configuration->getUrl($this->connectionData->subdomain)}",
+            [
+                $this->getOriginalHost(),
+                trim(json_encode($this->getOriginalHost()), '"'),
+            ],
+            [
+                $rewrittenHost,
+                trim(json_encode($rewrittenHost), '"'),
+            ],
             $chunk
         );
     }
