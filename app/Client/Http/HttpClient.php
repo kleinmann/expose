@@ -96,7 +96,7 @@ class HttpClient
             ->requestStreaming(
                 $request->getMethod(),
                 $uri,
-                $request->getHeaders(),
+                $this->rewriteRequestHeaders($request->getHeaders()),
                 $request->getBody()
             )
             ->then(function (ResponseInterface $response) use ($proxyConnection) {
@@ -184,17 +184,27 @@ class HttpClient
     protected function getOriginalHost()
     {
         $host = $this->connectionData->host;
-        $port = substr($host, strpos($host, ':') + 1);
+        $port = parse_url($host, \PHP_URL_PORT);
         $protocol = 'http';
 
-        if ($port === '443') {
+        if ($port === 443) {
             $protocol = 'https';
         }
 
-        if ($port === '80' || $port === '443') {
-            $host = substr($host, 0, strpos($host, ':'));
+        $host = parse_url($host, \PHP_URL_HOST);
+
+        if ($port === 80 || $port === 443) {
+            return "{$protocol}://{$host}";
         }
 
-        return "{$protocol}://{$host}";
+        return "{$protocol}://{$host}:{$port}";
+    }
+
+    protected function rewriteRequestHeaders($headers)
+    {
+        // Remove response compression to allow for response body rewriting
+        unset($headers['accept-encoding']);
+
+        return $headers;
     }
 }
