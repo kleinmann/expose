@@ -199,7 +199,7 @@ class HttpClient
             $protocol = 'https';
         }
 
-        $host = parse_url($host, \PHP_URL_HOST);
+        $host = parse_url("{$protocol}://{$host}", \PHP_URL_HOST);
 
         if ($port === 80 || $port === 443) {
             return "{$protocol}://{$host}";
