@@ -4,6 +4,7 @@ namespace App\Client\Http;
 
 use App\Client\Configuration;
 use App\Client\Http\Modifiers\CheckBasicAuthentication;
+use App\Client\Http\Modifiers\DefaultHostPorts;
 use App\Logger\RequestLogger;
 use GuzzleHttp\Psr7\Message;
 use function GuzzleHttp\Psr7\parse_request;
@@ -32,6 +33,7 @@ class HttpClient
     /** @var array */
     protected $modifiers = [
         CheckBasicAuthentication::class,
+        DefaultHostPorts::class,
     ];
     /** @var Configuration */
     protected $configuration;
