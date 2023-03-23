@@ -4,6 +4,7 @@ namespace App\Client\Http;
 
 use App\Client\Configuration;
 use App\Client\Http\Modifiers\CheckBasicAuthentication;
+use App\Client\Http\Modifiers\DefaultHostPorts;
 use App\Logger\RequestLogger;
 use GuzzleHttp\Psr7\Message;
 use function GuzzleHttp\Psr7\parse_request;
@@ -32,6 +33,7 @@ class HttpClient
     /** @var array */
     protected $modifiers = [
         CheckBasicAuthentication::class,
+        DefaultHostPorts::class,
     ];
     /** @var Configuration */
     protected $configuration;
@@ -96,7 +98,7 @@ class HttpClient
             ->requestStreaming(
                 $request->getMethod(),
                 $uri,
-                $request->getHeaders(),
+                $this->rewriteRequestHeaders($request->getHeaders()),
                 $request->getBody()
             )
             ->then(function (ResponseInterface $response) use ($proxyConnection) {
@@ -130,7 +132,7 @@ class HttpClient
     protected function sendChunkToServer(string $chunk, ?WebSocket $proxyConnection = null)
     {
         transform($proxyConnection, function ($proxyConnection) use ($chunk) {
-            $binaryMsg = new Frame($chunk, true, Frame::OP_BINARY);
+            $binaryMsg = new Frame($this->rewriteResponseBody($chunk), true, Frame::OP_BINARY);
             $proxyConnection->send($binaryMsg);
         });
     }
@@ -164,5 +166,55 @@ class HttpClient
         );
 
         return $response->withHeader('Location', $location);
+    }
+
+    protected function rewriteResponseBody($chunk)
+    {
+        if (! is_string($chunk)) {
+            return $chunk;
+        }
+
+        $httpProtocol = $this->configuration->port() === 443 ? 'https' : 'http';
+
+        $rewrittenHost = "{$httpProtocol}://{$this->configuration->getUrl($this->connectionData->subdomain)}";
+
+        return str_replace(
+            [
+                $this->getOriginalHost(),
+                trim(json_encode($this->getOriginalHost()), '"'),
+            ],
+            [
+                $rewrittenHost,
+                trim(json_encode($rewrittenHost), '"'),
+            ],
+            $chunk
+        );
+    }
+
+    protected function getOriginalHost()
+    {
+        $host = $this->connectionData->host;
+        $port = parse_url($host, \PHP_URL_PORT);
+        $protocol = 'http';
+
+        if ($port === 443 || $this->configuration->isSecureSharedUrl()) {
+            $protocol = 'https';
+        }
+
+        $host = parse_url("{$protocol}://{$host}", \PHP_URL_HOST);
+
+        if ($port === 80 || $port === 443) {
+            return "{$protocol}://{$host}";
+        }
+
+        return "{$protocol}://{$host}:{$port}";
+    }
+
+    protected function rewriteRequestHeaders($headers)
+    {
+        // Remove response compression to allow for response body rewriting
+        unset($headers['accept-encoding']);
+
+        return $headers;
     }
 }
