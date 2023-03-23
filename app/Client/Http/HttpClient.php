@@ -197,7 +197,7 @@ class HttpClient
         $port = parse_url($host, \PHP_URL_PORT);
         $protocol = 'http';
 
-        if ($port === 443) {
+        if ($port === 443 || $this->configuration->isSecureSharedUrl()) {
             $protocol = 'https';
         }
 
